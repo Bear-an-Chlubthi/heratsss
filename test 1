@@ -1,0 +1,112 @@
+import random
+
+class User:
+    def __init__(self, name):
+        self.name = name
+        self.balance = 1000  # Initial balance for the user
+
+    def get_balance(self):
+        return self.balance
+    
+    def deposit(self, amount):
+        self.balance += amount
+        
+    def withdraw(self, amount):
+        if self.balance >= amount:
+            self.balance -= amount
+            return True
+        else:
+            print("Insufficient funds.")
+            return False
+
+
+class BuyNowPayLater:
+    def __init__(self, user):
+        self.user = user
+    
+    def buy_now_pay_later(self, cost, installment_months=3):
+        if self.user.withdraw(cost / installment_months):
+            print(f"Bought for {cost} with {installment_months} months to pay later.")
+            return True
+        else:
+            return False
+
+
+class PaydayLoan:
+    def __init__(self, user):
+        self.user = user
+    
+    def take_loan(self, amount):
+        loan_fee = 0.1 * amount  # Assume a 10% fee on the loan amount
+        if self.user.withdraw(loan_fee):  # User pays the fee upfront
+            print(f"Loan of {amount} taken with fee of {loan_fee}.")
+            return True
+        else:
+            return False
+
+
+class Gambling:
+    def __init__(self, user):
+        self.user = user
+    
+    def gamble(self, amount):
+        if self.user.withdraw(amount):  # User bets the amount
+            result = random.choice([True, False])  # Randomly decide whether to win or lose
+            if result:
+                winnings = amount * 2  # Double the bet as a reward
+                print(f"Congratulations! You won {winnings}.")
+                self.user.deposit(winnings)
+                return True
+            else:
+                print("Sorry, you lost.")
+                return False
+        else:
+            print("Insufficient funds for gambling.")
+            return False
+
+
+# Example usage
+
+if __name__ == "__main__":
+    user = User(name="Alice")
+
+    buy_now_pay_later_service = BuyNowPayLater(user)
+    payday_loan_service = PaydayLoan(user)
+    gambling_service = Gambling(user)
+
+    # Deposit some money
+    user.deposit(2000)  # Alice has now $2000
+
+    print(f"Current Balance: {user.get_balance()}")
+
+    # Buy Now Pay Later Transaction
+    if buy_now_pay_later_service.buy_now_pay_later(cost=150):
+        print("Buy Now Pay Later transaction successful.")
+    
+    print(f"After BNPL, Current Balance: {user.get_balance()}")
+
+    # Take a payday loan
+    if payday_loan_service.take_loan(amount=300):
+        print("Payday Loan taken successfully.")
+    
+    print(f"Current Balance after Loan: {user.get_balance()}")
+
+    # Gamble some money
+    if gambling_service.gamble(100):
+        print("Gambled and won!")
+    else:
+        print("Lost the gamble.")
+
+    print(f"After Gambling, Current Balance: {user.get_balance()}")
+```
+
+### Explanation:
+
+- **User Class**: Holds user information and manages their balance.
+- **BuyNowPayLater Class**: Facilitates buy now pay later transactions by breaking down costs into installments.
+- **PaydayLoan Class**: Handles payday loans with a fee.
+- **Gambling Class**: Simulates basic gambling (slot machine style) where the user can win or lose.
+
+### Running the Code
+When you run this script, it will simulate Alice making various financial actions and display the results. You can adjust the values 
+as needed to fit your specific requirements.

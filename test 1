@@ -80,69 +80,97 @@ class DashboardPage(tk.Frame):
         self.user = controller.user
 
         # Header
-        tk.Label(self, text=f"Welcome back, {self.user.name}", fg="#888", bg="#121212", font=("Helvetica", 10)).pack(pady=(30, 0))
+        tk.Label(self, text=f"Welcome back, {self.user.name}", fg="#888", bg="#121212", font=("Helvetica", 10)).pack(pady=(20, 0))
 
         # Balance Card
-        card = tk.Frame(self, bg="#1E1E1E", padx=20, pady=30, highlightthickness=1, highlightbackground="#333")
-        card.pack(padx=25, pady=20, fill="x")
+        self.card = tk.Frame(self, bg="#1E1E1E", padx=20, pady=25, highlightthickness=1, highlightbackground="#333")
+        self.card.pack(padx=25, pady=15, fill="x")
         
-        tk.Label(card, text="AVAILABLE TO CASH OUT", fg="#00D084", bg="#1E1E1E", font=("Helvetica", 8, "bold")).pack()
+        tk.Label(self.card, text="AVAILABLE TO CASH OUT", fg="#00D084", bg="#1E1E1E", font=("Helvetica", 8, "bold")).pack()
         self.balance_var = tk.StringVar(value=f"${self.user.balance:,.2f}")
-        tk.Label(card, textvariable=self.balance_var, fg="white", bg="#1E1E1E", font=("Helvetica", 36, "bold")).pack()
+        self.lbl_balance = tk.Label(self.card, textvariable=self.balance_var, fg="white", bg="#1E1E1E", font=("Helvetica", 32, "bold"))
+        self.lbl_balance.pack()
 
-        # Input Section
-        tk.Label(self, text="Set Amount", fg="#AAA", bg="#121212", font=("Helvetica", 9, "bold")).pack(pady=(10, 5))
+        # Amount Input
+        tk.Label(self, text="Set Transaction Amount", fg="#AAA", bg="#121212", font=("Helvetica", 9, "bold")).pack(pady=(5, 5))
         self.amount_entry = tk.Entry(self, justify="center", font=("Helvetica", 20), bg="#000", fg="#00D084", borderwidth=0, insertbackground="white")
         self.amount_entry.insert(0, "100")
-        self.amount_entry.pack(pady=5, padx=60, ipady=10)
+        self.amount_entry.pack(pady=5, padx=60, ipady=8)
 
-        # Buttons
+        # Action Buttons
         self.create_modern_btn("Transfer to Bank", "#7042F4", self.do_loan)
         self.create_modern_btn("Buy Now, Pay Later", "#333333", self.do_bnpl)
         self.create_modern_btn("Instant Gamble", "#FF4500", self.do_gamble)
 
+        # Transaction History Section
+        tk.Label(self, text="RECENT ACTIVITY", fg="#555", bg="#121212", font=("Helvetica", 8, "bold")).pack(pady=(20, 5))
+        self.history_frame = tk.Frame(self, bg="#181818", height=150)
+        self.history_frame.pack(fill="both", padx=25, pady=5, expand=True)
+        
+        self.history_list = tk.Listbox(self.history_frame, bg="#181818", fg="#EEE", borderwidth=0, 
+                                       highlightthickness=0, font=("Helvetica", 10), selectbackground="#181818")
+        self.history_list.pack(fill="both", expand=True, padx=10, pady=10)
+
         # Sign Out
         tk.Button(self, text="Secure Sign Out", command=lambda: controller.show_frame("LoginPage"), 
-                  bg="#121212", fg="#555", bd=0, font=("Helvetica", 9, "underline")).pack(side="bottom", pady=20)
+                  bg="#121212", fg="#444", bd=0, font=("Helvetica", 9, "underline")).pack(side="bottom", pady=10)
 
     def create_modern_btn(self, text, color, cmd):
         f = tk.Frame(self, bg=color, cursor="hand2")
-        f.pack(pady=8, padx=40, fill="x")
-        l = tk.Label(f, text=text, fg="white", bg=color, font=("Helvetica", 11, "bold"), pady=15)
+        f.pack(pady=6, padx=40, fill="x")
+        l = tk.Label(f, text=text, fg="white", bg=color, font=("Helvetica", 11, "bold"), pady=12)
         l.pack()
+        
+        # Hover effects
+        f.bind("<Enter>", lambda e: f.config(bg="#444") if color == "#333333" else None)
+        f.bind("<Leave>", lambda e: f.config(bg=color))
+        
         f.bind("<Button-1>", lambda e: cmd())
         l.bind("<Button-1>", lambda e: cmd())
 
+    def log_transaction(self, message, is_positive=True):
+        symbol = "+" if is_positive else "-"
+        color = "#00D084" if is_positive else "#FF4500"
+        self.history_list.insert(0, f"{message}")
+        self.history_list.itemconfig(0, fg=color)
+
     def update_ui(self):
         self.balance_var.set(f"${self.user.balance:,.2f}")
+        # Change balance color if low
+        if self.user.balance < 500:
+            self.lbl_balance.config(fg="#FF4500")
+        else:
+            self.lbl_balance.config(fg="white")
+
+    def get_val(self):
+        try:
+            return float(self.amount_entry.get())
+        except:
+            messagebox.showwarning("Error", "Enter a valid amount")
+            return None
 
     def do_loan(self):
-        try:
-            amt = float(self.amount_entry.get())
+        amt = self.get_val()
+        if amt:
             self.user.deposit(amt)
             self.update_ui()
-            messagebox.showinfo("SwiftPay", f"${amt} Transfer initiated!")
-        except: pass
+            self.log_transaction(f"Deposited: ${amt:,.2f}", True)
 
     def do_bnpl(self):
-        try:
-            amt = float(self.amount_entry.get())
-            if self.user.withdraw(amt/4):
-                self.update_ui()
-                messagebox.showinfo("BNPL", "Plan Created!")
-        except: pass
+        amt = self.get_val()
+        if amt and self.user.withdraw(amt/4):
+            self.update_ui()
+            self.log_transaction(f"BNPL Payment: ${amt/4:,.2f}", False)
 
     def do_gamble(self):
-        try:
-            amt = float(self.amount_entry.get())
-            if self.user.withdraw(amt):
-                if random.random() > 0.5:
-                    self.user.deposit(amt * 2)
-                    messagebox.showinfo("Winner!", "Doubled your money!")
-                else:
-                    messagebox.showerror("Lost", "Try again!")
-                self.update_ui()
-        except: pass
+        amt = self.get_val()
+        if amt and self.user.withdraw(amt):
+            if random.random() > 0.5:
+                self.user.deposit(amt * 2)
+                self.log_transaction(f"Gamble Win: ${amt:,.2f}", True)
+            else:
+                self.log_transaction(f"Gamble Loss: ${amt:,.2f}", False)
+            self.update_ui()
 
 # --- 5. RUN ---
 if __name__ == "__main__":

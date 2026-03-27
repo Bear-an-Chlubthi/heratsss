@@ -78,11 +78,17 @@ class DashboardPage(tk.Frame):
         super().__init__(parent, bg="#121212")
         self.controller = controller
         self.user = controller.user
+        self.current_tip = 0
 
-        # Header
-        tk.Label(self, text=f"Welcome back, {self.user.name}", fg="#888", bg="#121212", font=("Helvetica", 10)).pack(pady=(20, 0))
+        # 1. Top Status Notification Bar
+        self.status_bar = tk.Label(self, text="", fg="white", bg="#00D084", font=("Helvetica", 10, "bold"), pady=5)
+        self.status_bar.pack(fill="x")
+        self.status_bar.pack_forget() 
 
-        # Balance Card
+        # 2. Header
+        tk.Label(self, text=f"Welcome back, {self.user.name}", fg="#888", bg="#121212", font=("Helvetica", 10)).pack(pady=(15, 0))
+
+        # 3. Balance Card
         self.card = tk.Frame(self, bg="#1E1E1E", padx=20, pady=25, highlightthickness=1, highlightbackground="#333")
         self.card.pack(padx=25, pady=15, fill="x")
         
@@ -91,86 +97,234 @@ class DashboardPage(tk.Frame):
         self.lbl_balance = tk.Label(self.card, textvariable=self.balance_var, fg="white", bg="#1E1E1E", font=("Helvetica", 32, "bold"))
         self.lbl_balance.pack()
 
-        # Amount Input
-        tk.Label(self, text="Set Transaction Amount", fg="#AAA", bg="#121212", font=("Helvetica", 9, "bold")).pack(pady=(5, 5))
-        self.amount_entry = tk.Entry(self, justify="center", font=("Helvetica", 20), bg="#000", fg="#00D084", borderwidth=0, insertbackground="white")
+        # 4. Input Section
+        tk.Label(self, text="Set Amount", fg="#AAA", bg="#121212", font=("Helvetica", 9, "bold")).pack(pady=(5, 5))
+        self.amount_entry = tk.Entry(self, justify="center", font=("Helvetica", 22), bg="#000", fg="#00D084", borderwidth=0, insertbackground="white")
         self.amount_entry.insert(0, "100")
-        self.amount_entry.pack(pady=5, padx=60, ipady=8)
+        self.amount_entry.pack(pady=5, padx=60, ipady=10)
 
-        # Action Buttons
-        self.create_modern_btn("Transfer to Bank", "#7042F4", self.do_loan)
+        # 5. Primary Action Buttons
+        self.create_modern_btn("Cash Out Now", "#7042F4", self.do_loan)
         self.create_modern_btn("Buy Now, Pay Later", "#333333", self.do_bnpl)
         self.create_modern_btn("Instant Gamble", "#FF4500", self.do_gamble)
 
-        # Transaction History Section
-        tk.Label(self, text="RECENT ACTIVITY", fg="#555", bg="#121212", font=("Helvetica", 8, "bold")).pack(pady=(20, 5))
-        self.history_frame = tk.Frame(self, bg="#181818", height=150)
-        self.history_frame.pack(fill="both", padx=25, pady=5, expand=True)
-        
-        self.history_list = tk.Listbox(self.history_frame, bg="#181818", fg="#EEE", borderwidth=0, 
-                                       highlightthickness=0, font=("Helvetica", 10), selectbackground="#181818")
-        self.history_list.pack(fill="both", expand=True, padx=10, pady=10)
+        # 6. Activity Feed
+        tk.Label(self, text="RECENT ACTIVITY", fg="#555", bg="#121212", font=("Helvetica", 8, "bold")).pack(pady=(15, 5))
+        self.history_list = tk.Listbox(self, bg="#121212", fg="#EEE", borderwidth=0, highlightthickness=0, 
+                                       font=("Helvetica", 10), selectbackground="#121212", height=6)
+        self.history_list.pack(fill="both", expand=True, padx=30)
 
-        # Sign Out
+        # 7. Secure Sign Out
         tk.Button(self, text="Secure Sign Out", command=lambda: controller.show_frame("LoginPage"), 
                   bg="#121212", fg="#444", bd=0, font=("Helvetica", 9, "underline")).pack(side="bottom", pady=10)
 
-    def create_modern_btn(self, text, color, cmd):
-        f = tk.Frame(self, bg=color, cursor="hand2")
-        f.pack(pady=6, padx=40, fill="x")
+    def create_modern_btn(self, text, color, cmd, parent=None):
+        target = parent if parent else self
+        f = tk.Frame(target, bg=color, cursor="hand2")
+        f.pack(pady=5, padx=40, fill="x")
         l = tk.Label(f, text=text, fg="white", bg=color, font=("Helvetica", 11, "bold"), pady=12)
         l.pack()
-        
-        # Hover effects
-        f.bind("<Enter>", lambda e: f.config(bg="#444") if color == "#333333" else None)
-        f.bind("<Leave>", lambda e: f.config(bg=color))
-        
         f.bind("<Button-1>", lambda e: cmd())
         l.bind("<Button-1>", lambda e: cmd())
+        return f
 
-    def log_transaction(self, message, is_positive=True):
-        symbol = "+" if is_positive else "-"
-        color = "#00D084" if is_positive else "#FF4500"
-        self.history_list.insert(0, f"{message}")
+def show_tip_modal(self, amount):
+        """Manipulative Earnin-style tip overlay"""
+        self.modal = tk.Toplevel(self)
+        self.modal.geometry("380x550")
+        self.modal.configure(bg="#1E1E1E")
+        self.modal.transient(self)
+        self.modal.grab_set()
+
+        # 1. Guilt-tripping Header
+        tk.Label(self.modal, text="Pay it Forward", fg="#00D084", bg="#1E1E1E", font=("Helvetica", 20, "bold")).pack(pady=(30, 10))
+        
+        guilt_text = ("Most SwiftPay members tip $5 or more\nto help keep this service interest-free\n"
+                      "for the community.")
+        tk.Label(self.modal, text=guilt_text, fg="#AAA", bg="#1E1E1E", font=("Helvetica", 10)).pack(pady=5)
+
+        # 2. Recommended / Highlighted Tip
+        tk.Label(self.modal, text="RECOMMENDED FOR YOU", fg="#7042F4", bg="#1E1E1E", font=("Helvetica", 8, "bold")).pack(pady=(20, 0))
+        self.create_tip_option("$10 Tip", "#7042F4", 10, amount, is_recommended=True)
+        
+        # 3. Standard Options
+        self.create_tip_option("$5 Tip", "#333", 5, amount)
+        self.create_tip_option("$2 Tip", "#333", 2, amount)
+
+       # --- 4. DASHBOARD PAGE ---
+class DashboardPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent, bg="#121212")
+        self.controller = controller
+        self.user = controller.user
+        self.current_tip = 0
+
+        # 1. Top Status Notification Bar
+        self.status_bar = tk.Label(self, text="", fg="white", bg="#00D084", font=("Helvetica", 10, "bold"), pady=5)
+        self.status_bar.pack(fill="x")
+        self.status_bar.pack_forget() 
+
+        # 2. Header
+        tk.Label(self, text=f"Welcome back, {self.user.name}", fg="#888", bg="#121212", font=("Helvetica", 10)).pack(pady=(15, 0))
+
+        # 3. Balance Card
+        self.card = tk.Frame(self, bg="#1E1E1E", padx=20, pady=25, highlightthickness=1, highlightbackground="#333")
+        self.card.pack(padx=25, pady=15, fill="x")
+        
+        tk.Label(self.card, text="AVAILABLE TO CASH OUT", fg="#00D084", bg="#1E1E1E", font=("Helvetica", 8, "bold")).pack()
+        self.balance_var = tk.StringVar(value=f"${self.user.balance:,.2f}")
+        self.lbl_balance = tk.Label(self.card, textvariable=self.balance_var, fg="white", bg="#1E1E1E", font=("Helvetica", 32, "bold"))
+        self.lbl_balance.pack()
+
+        # 4. Input Section
+        tk.Label(self, text="Set Amount", fg="#AAA", bg="#121212", font=("Helvetica", 9, "bold")).pack(pady=(5, 5))
+        self.amount_entry = tk.Entry(self, justify="center", font=("Helvetica", 22), bg="#000", fg="#00D084", borderwidth=0, insertbackground="white")
+        self.amount_entry.insert(0, "100")
+        self.amount_entry.pack(pady=5, padx=60, ipady=10)
+
+        # 5. Primary Action Buttons
+        self.create_modern_btn("Cash Out Now", "#7042F4", self.do_loan)
+        self.create_modern_btn("Buy Now, Pay Later", "#333333", self.do_bnpl)
+        self.create_modern_btn("Instant Gamble", "#FF4500", self.do_gamble)
+
+        # 6. Activity Feed
+        tk.Label(self, text="RECENT ACTIVITY", fg="#555", bg="#121212", font=("Helvetica", 8, "bold")).pack(pady=(15, 5))
+        self.history_list = tk.Listbox(self, bg="#121212", fg="#EEE", borderwidth=0, highlightthickness=0, 
+                                       font=("Helvetica", 10), selectbackground="#121212", height=6)
+        self.history_list.pack(fill="both", expand=True, padx=30)
+
+        # 7. Secure Sign Out
+        tk.Button(self, text="Secure Sign Out", command=lambda: controller.show_frame("LoginPage"), 
+                  bg="#121212", fg="#444", bd=0, font=("Helvetica", 9, "underline")).pack(side="bottom", pady=10)
+
+    def create_modern_btn(self, text, color, cmd, parent=None):
+        target = parent if parent else self
+        f = tk.Frame(target, bg=color, cursor="hand2")
+        f.pack(pady=5, padx=40, fill="x")
+        l = tk.Label(f, text=text, fg="white", bg=color, font=("Helvetica", 11, "bold"), pady=12)
+        l.pack()
+        f.bind("<Button-1>", lambda e: cmd())
+        l.bind("<Button-1>", lambda e: cmd())
+        return f
+
+    def show_tip_modal(self, amount):
+        """Manipulative Earnin-style tip overlay"""
+        self.modal = tk.Toplevel(self)
+        self.modal.geometry("380x550")
+        self.modal.configure(bg="#1E1E1E")
+        self.modal.transient(self)
+        self.modal.grab_set()
+
+        # 1. Guilt-tripping Header
+        tk.Label(self.modal, text="Pay it Forward", fg="#00D084", bg="#1E1E1E", font=("Helvetica", 20, "bold")).pack(pady=(30, 10))
+        
+        guilt_text = ("Most SwiftPay members tip $5 or more\nto help keep this service interest-free\n"
+                      "for the community.")
+        tk.Label(self.modal, text=guilt_text, fg="#AAA", bg="#1E1E1E", font=("Helvetica", 10)).pack(pady=5)
+
+        # 2. Recommended / Highlighted Tip
+        tk.Label(self.modal, text="RECOMMENDED FOR YOU", fg="#7042F4", bg="#1E1E1E", font=("Helvetica", 8, "bold")).pack(pady=(20, 0))
+        self.create_tip_option("$10 Tip", "#7042F4", 10, amount, is_recommended=True)
+        
+        # 3. Standard Options
+        self.create_tip_option("$5 Tip", "#333", 5, amount)
+        self.create_tip_option("$2 Tip", "#333", 2, amount)
+
+        # 4. Negative Framing for "No Tip"
+        tk.Label(self.modal, text="I don't want to support the community", fg="#444", bg="#1E1E1E", font=("Helvetica", 8)).pack(pady=(20, 0))
+        
+        f_no = tk.Frame(self.modal, bg="#1E1E1E", cursor="hand2")
+        f_no.pack(pady=5)
+        l_no = tk.Label(f_no, text="Skip Tip & Continue", fg="#666", bg="#1E1E1E", 
+                        font=("Helvetica", 10, "underline"), pady=5)
+        l_no.pack()
+
+        def skip():
+            self.current_tip = 0
+            self.modal.destroy()
+            self.execute_cash_out(amount)
+
+        f_no.bind("<Button-1>", lambda e: skip())
+        l_no.bind("<Button-1>", lambda e: skip())
+
+    def create_tip_option(self, text, color, tip_val, original_amt, is_recommended=False):
+        highlight = "#7042F4" if is_recommended else "#333"
+        f = tk.Frame(self.modal, bg=highlight, cursor="hand2", padx=2 if is_recommended else 0, pady=2 if is_recommended else 0)
+        f.pack(pady=5, padx=50, fill="x")
+        
+        l = tk.Label(f, text=text, fg="white", bg=color, font=("Helvetica", 11, "bold"), pady=15)
+        l.pack(fill="x")
+        
+        def select_tip():
+            self.current_tip = tip_val
+            self.modal.destroy()
+            self.show_notification(f"Generous! ${tip_val} tip added.", "#7042F4")
+            self.execute_cash_out(original_amt)
+
+        f.bind("<Button-1>", lambda e: select_tip())
+        l.bind("<Button-1>", lambda e: select_tip())
+
+    def do_loan(self):
+        try:
+            val = self.amount_entry.get()
+            amt = float(val)
+            self.show_tip_modal(amt)
+        except ValueError:
+            self.show_notification("Invalid Amount", "#FF4500")
+
+    def execute_cash_out(self, amt):
+        self.show_notification(f"Processing Transfer...", "#7042F4")
+        
+        def finish():
+            total_deduction = self.current_tip
+            if self.user.withdraw(total_deduction):
+                self.user.deposit(amt)
+                self.update_ui()
+                self.log_act(f"Cash Out: +${amt:,.2f}", True)
+                if self.current_tip > 0:
+                    self.log_act(f"Community Tip: -${self.current_tip:,.2f}", False)
+                self.show_notification(f"Success! ${amt} sent to bank.")
+            else:
+                self.show_notification("Insufficient funds for tip!", "#FF4500")
+            
+        self.after(1500, finish)
+
+    def show_notification(self, message, color="#00D084"):
+        self.status_bar.config(text=message, bg=color)
+        self.status_bar.pack(fill="x", side="top", before=self.card)
+        self.after(3000, self.status_bar.pack_forget)
+
+    def log_act(self, msg, pos=True):
+        color = "#00D084" if pos else "#FF4500"
+        self.history_list.insert(0, f"• {msg}")
         self.history_list.itemconfig(0, fg=color)
 
     def update_ui(self):
         self.balance_var.set(f"${self.user.balance:,.2f}")
-        # Change balance color if low
-        if self.user.balance < 500:
-            self.lbl_balance.config(fg="#FF4500")
-        else:
-            self.lbl_balance.config(fg="white")
-
-    def get_val(self):
-        try:
-            return float(self.amount_entry.get())
-        except:
-            messagebox.showwarning("Error", "Enter a valid amount")
-            return None
-
-    def do_loan(self):
-        amt = self.get_val()
-        if amt:
-            self.user.deposit(amt)
-            self.update_ui()
-            self.log_transaction(f"Deposited: ${amt:,.2f}", True)
 
     def do_bnpl(self):
-        amt = self.get_val()
-        if amt and self.user.withdraw(amt/4):
-            self.update_ui()
-            self.log_transaction(f"BNPL Payment: ${amt/4:,.2f}", False)
+        try:
+            amt = float(self.amount_entry.get())
+            if self.user.withdraw(amt/4):
+                self.update_ui()
+                self.log_act(f"BNPL Payment: -${amt/4:,.2f}", False)
+                self.show_notification("Payment Confirmed", "#333")
+        except: pass
 
     def do_gamble(self):
-        amt = self.get_val()
-        if amt and self.user.withdraw(amt):
-            if random.random() > 0.5:
-                self.user.deposit(amt * 2)
-                self.log_transaction(f"Gamble Win: ${amt:,.2f}", True)
-            else:
-                self.log_transaction(f"Gamble Loss: ${amt:,.2f}", False)
-            self.update_ui()
+        try:
+            amt = float(self.amount_entry.get())
+            if self.user.withdraw(amt):
+                if random.random() > 0.5:
+                    win = amt * 2
+                    self.user.deposit(win)
+                    self.log_act(f"Gamble Win: +${win:,.2f}", True)
+                    self.show_notification("YOU WON!", "#00D084")
+                else:
+                    self.log_act(f"Gamble Loss: -${amt:,.2f}", False)
+                    self.show_notification("Try Again", "#FF4500")
+                self.update_ui()
+        except: pass
 
 # --- 5. RUN ---
 if __name__ == "__main__":

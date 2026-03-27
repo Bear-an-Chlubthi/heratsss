@@ -312,19 +312,144 @@ class DashboardPage(tk.Frame):
         except: pass
 
     def do_gamble(self):
+        """Triggers the FanDuel-style Blackjack mini-game"""
         try:
             amt = float(self.amount_entry.get())
+            if amt <= 0:
+                self.show_notification("Enter a bet amount", "#FF4500")
+                return
             if self.user.withdraw(amt):
-                if random.random() > 0.5:
-                    win = amt * 2
-                    self.user.deposit(win)
-                    self.log_act(f"Gamble Win: +${win:,.2f}", True)
-                    self.show_notification("YOU WON!", "#00D084")
-                else:
-                    self.log_act(f"Gamble Loss: -${amt:,.2f}", False)
-                    self.show_notification("Try Again", "#FF4500")
-                self.update_ui()
-        except: pass
+                self.open_blackjack(amt)
+            else:
+                self.show_notification("Insufficient Funds!", "#FF4500")
+        except ValueError:
+            self.show_notification("Invalid Bet Amount", "#FF4500")
+
+    def open_blackjack(self, bet_amount):
+        """Creates a FanDuel-inspired Blackjack window with graphical cards"""
+        self.bj_window = tk.Toplevel(self)
+        self.bj_window.title("SwiftPay Casino: Blackjack")
+        self.bj_window.geometry("400x650")
+        self.bj_window.configure(bg="#063170") # FanDuel Blue
+        self.bj_window.grab_set()
+
+        # Game State
+        # Mapping values to symbols for a "real" feel
+        self.deck = [('2',2), ('3',3), ('4',4), ('5',5), ('6',6), ('7',7), ('8',8), 
+                     ('9',9), ('10',10), ('J',10), ('Q',10), ('K',10), ('A',11)] * 4
+        random.shuffle(self.deck)
+        
+        self.player_hand = [self.deck.pop(), self.deck.pop()]
+        self.dealer_hand = [self.deck.pop(), self.deck.pop()]
+        self.bet = bet_amount
+
+        # --- UI LAYOUT ---
+        tk.Label(self.bj_window, text="DEALER", fg="#63a7ff", bg="#063170", font=("Helvetica", 10, "bold")).pack(pady=(20, 0))
+        self.dealer_card_frame = tk.Frame(self.bj_window, bg="#063170")
+        self.dealer_card_frame.pack(pady=10)
+        self.dealer_score_label = tk.Label(self.bj_window, text="Score: ?", fg="white", bg="#011c4d", font=("Helvetica", 9), padx=10)
+        self.dealer_score_label.pack()
+
+        tk.Label(self.bj_window, text=f"TOTAL POT: ${self.bet * 2:,.2f}", fg="#00D084", bg="#063170", font=("Helvetica", 14, "bold")).pack(pady=30)
+
+        tk.Label(self.bj_window, text="YOUR HAND", fg="#63a7ff", bg="#063170", font=("Helvetica", 10, "bold")).pack()
+        self.player_card_frame = tk.Frame(self.bj_window, bg="#063170")
+        self.player_card_frame.pack(pady=10)
+        self.player_score_label = tk.Label(self.bj_window, text="Score: 0", fg="white", bg="#011c4d", font=("Helvetica", 9), padx=10)
+        self.player_score_label.pack()
+        
+        # Buttons
+        self.btn_frame = tk.Frame(self.bj_window, bg="#063170")
+        self.btn_frame.pack(side="bottom", pady=40)
+
+        self.hit_btn = tk.Button(self.btn_frame, text="HIT", command=self.bj_hit, bg="#00D084", fg="black", 
+                                 width=12, font=("Helvetica", 12, "bold"), relief="flat")
+        self.hit_btn.pack(side="left", padx=10)
+
+        self.stay_btn = tk.Button(self.btn_frame, text="STAY", command=self.bj_stay, bg="#7042F4", fg="white", 
+                                  width=12, font=("Helvetica", 12, "bold"), relief="flat")
+        self.stay_btn.pack(side="left", padx=10)
+
+        self.update_bj_display(hide_dealer=True)
+
+    def create_card_ui(self, parent, card_label, is_hidden=False):
+        """Creates a visual card object"""
+        bg_color = "#FFFFFF" if not is_hidden else "#1e437a"
+        fg_color = "#222222" if not is_hidden else "#1e437a"
+        text = card_label if not is_hidden else "?"
+        
+        card = tk.Frame(parent, bg=bg_color, highlightbackground="#000", highlightthickness=1, width=60, height=90)
+        card.pack_propagate(False)
+        card.pack(side="left", padx=5)
+        
+        tk.Label(card, text=text, fg=fg_color, bg=bg_color, font=("Helvetica", 18, "bold")).place(relx=0.5, rely=0.5, anchor="center")
+        return card
+
+    def update_bj_display(self, hide_dealer=True):
+        # Clear existing cards
+        for widget in self.player_card_frame.winfo_children(): widget.destroy()
+        for widget in self.dealer_card_frame.winfo_children(): widget.destroy()
+
+        # Display Player Cards
+        for card in self.player_hand:
+            self.create_card_ui(self.player_card_frame, card[0])
+        p_total = sum(c[1] for c in self.player_hand)
+        self.player_score_label.config(text=f"SCORE: {p_total}")
+        
+        # Display Dealer Cards
+        if hide_dealer:
+            self.create_card_ui(self.dealer_card_frame, self.dealer_hand[0][0])
+            self.create_card_ui(self.dealer_card_frame, "?", is_hidden=True)
+            self.dealer_score_label.config(text="SCORE: ?")
+        else:
+            for card in self.dealer_hand:
+                self.create_card_ui(self.dealer_card_frame, card[0])
+            d_total = sum(c[1] for c in self.dealer_hand)
+            self.dealer_score_label.config(text=f"SCORE: {d_total}")
+
+        if p_total > 21:
+            self.bj_end("BUST! DEALER WINS")
+
+    def bj_hit(self):
+        self.player_hand.append(self.deck.pop())
+        self.update_bj_display()
+
+    def bj_stay(self):
+        self.hit_btn.config(state="disabled")
+        self.stay_btn.config(state="disabled")
+        
+        while sum(c[1] for c in self.dealer_hand) < 17:
+            self.dealer_hand.append(self.deck.pop())
+        
+        self.update_bj_display(hide_dealer=False)
+        
+        p_score = sum(c[1] for c in self.player_hand)
+        d_score = sum(c[1] for c in self.dealer_hand)
+
+        if d_score > 21:
+            self.user.deposit(self.bet * 2)
+            self.bj_end("DEALER BUSTS! YOU WIN")
+        elif p_score > d_score:
+            self.user.deposit(self.bet * 2)
+            self.bj_end("YOU WIN!")
+        elif p_score == d_score:
+            self.user.deposit(self.bet)
+            self.bj_end("PUSH (TIE)")
+        else:
+            self.bj_end("DEALER WINS")
+
+    def bj_end(self, message):
+        self.hit_btn.config(state="disabled")
+        self.stay_btn.config(state="disabled")
+        self.update_ui()
+        self.log_act(f"Blackjack: {message}", "WIN" in message)
+        
+        # Overlay Result
+        overlay = tk.Label(self.bj_window, text=message, fg="white", bg="#1E1E1E", 
+                           font=("Helvetica", 16, "bold"), pady=20)
+        overlay.pack(side="bottom", fill="x")
+        
+        self.bj_window.after(3000, self.bj_window.destroy)
 
 # --- 5. RUN ---
 if __name__ == "__main__":
